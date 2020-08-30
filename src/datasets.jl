@@ -13,14 +13,8 @@ function load(D::Type{<:Dataset}, T = Float32; kwargs...)
     return reshape_dataset.(load_raw(D, T); kwargs...)
 end
 
-function reshape_dataset((x,y)::Tuple; onehot = false, labelmap = identity)
-    ym = labelmap.(y)
-    if onehot
-        labels = Flux.onehotbatch(vec(ym), sort(unique(ym)))
-    else
-        labels = reshape_labels(ym)
-    end
-    return (reshape_samples(x), labels)
+function reshape_dataset((x,y)::Tuple; labelmap = identity)
+    return (reshape_samples(x), reshape_labels(labelmap.(y)))
 end
 
 reshape_labels(y) = y
