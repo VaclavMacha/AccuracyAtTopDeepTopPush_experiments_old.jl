@@ -1,4 +1,5 @@
-using Flux: params, binarycrossentropy, sigmoid
+using Flux: params, sigmoid
+using Flux.Losses: binarycrossentropy
 using Zygote: @nograd
 using AccuracyAtTop
 
@@ -8,20 +9,15 @@ using AccuracyAtTop
 abstract type Model end
 abstract type BaseLine <: Model end
 
-function weights(y)
-    n_pos = sum(y .== 1)
-    n_neg = length(y) - n_pos
-    return y ./ n_pos .+ (1 .- y) ./ n_neg
-end
+weights(x, y) = eltype(x).(y ./ sum(y .== 1) .+ (1 .- y) ./ sum(y .== 0))
 
 @nograd weights
 
-function build_model(type::Type{BaseLine}, arg, surrogate, reg; T = Float32)
+function build_loss(::Type{BaseLine}, arg, surrogate, reg)
 
-    function loss(x, y, model, pars)
+    function loss(x, y, model, pars; w = weights(x, y))
         s = model(x)
-        w = weights(y)
-        return sum(binarycrossentropy.(sigmoid.(s), y) .* w) + reg * sum(sqsum, pars)
+        return binarycrossentropy(sigmoid.(s), y; agg = x -> sum(w .* x)) + eltype(x)(reg) * sum(sqsum, pars)
     end
     return loss
 end
@@ -31,19 +27,19 @@ abstract type DeepTopPush <: Model end
 abstract type PatMat <: Model end
 abstract type PatMatNP <: Model end
 
-build_threshold(::DeepTopPush, arg) = Maximum(; samples = NegSamples)
-build_threshold(::PatMat, τ::Real) = Quantile(τ; samples = AllSamples)
-build_threshold(::PatMatNP, τ::Real) = FPRate(τ)
+build_threshold(::Type{DeepTopPush}, arg) = Maximum(; samples = NegSamples)
+build_threshold(::Type{PatMat}, τ::Real) = Quantile(τ; samples = AllSamples)
+build_threshold(::Type{PatMatNP}, τ::Real) = FPRate(τ)
 
 sqsum(x) = sum(abs2, x)
 
-function build_model(type, arg, surrogate, reg; T = Float32)
+function build_loss(type, arg, surrogate, reg)
     thres = build_threshold(type, arg)
 
     function loss(x, y, model, pars)
         s = model(x)
         t = threshold(thres, y, s)
-        return fnr(y, s, t, surrogate) + reg * sum(sqsum, pars)
+        return fnr(y, s, t, surrogate) + eltype(x)(reg) * sum(sqsum, pars)
     end
     return loss
 end
