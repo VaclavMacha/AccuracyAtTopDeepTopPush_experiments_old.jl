@@ -207,3 +207,17 @@ function save_simulation(
     bson(datadir(dataset_dir, train_dir, simul_name), simulation)
     return
 end
+
+
+function dict_list_simple(d::Dict)
+    ls = map(values(d)) do val
+        typeof(val) <: AbstractVector ? length(val) : 1
+    end
+    if length(unique(ls)) > 2
+        @error "not supported"
+    else
+        return map(1:maximum(ls)) do k
+            Dict(key => typeof(val) <: AbstractVector ? val[k] : val for (key, val) in d)
+        end
+    end
+end
