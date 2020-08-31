@@ -29,8 +29,8 @@ function batch_provider(x, y, batchsize)
 
     function make_batch(; buffer::Bool = false)
         inds = vcat(
-            sample(neg, n_neg; replace = false),
-            sample(pos, n_pos; replace = false),
+            sample(neg, n_neg; replace = length(neg) < n_neg),
+            sample(pos, n_pos; replace = length(pos) < n_pos),
         )
         if buffer
             addind = AccuracyAtTop.BUFFER[].ind
@@ -201,10 +201,13 @@ function save_simulation(
     delete!(train_settings, :epochs)
     delete!(train_settings, :iters)
     train_dir = savename(train_settings; allowedtypes = allowedtypes())
+
+    savedir = datadir(dataset_dir, string(model_settings[:type]), train_dir)
+
     simul_name = string(savename(model_dict; allowedtypes = allowedtypes()), ".bson")
 
-    isdir(datadir(dataset_dir, train_dir)) || mkpath(datadir(dataset_dir, train_dir))
-    bson(datadir(dataset_dir, train_dir, simul_name), simulation)
+    isdir(savedir) || mkpath(savedir)
+    bson(joinpath(savedir, simul_name), simulation)
     return
 end
 
@@ -218,6 +221,70 @@ function dict_list_simple(d::Dict)
     else
         return map(1:maximum(ls)) do k
             Dict(key => typeof(val) <: AbstractVector ? val[k] : val for (key, val) in d)
+        end
+    end
+end
+
+# -------------------------------------------------------------------------------
+# Runing simulations
+# -------------------------------------------------------------------------------
+function run_simulations(Dataset_Settings, Train_Settings, Model_Settings)
+    for dataset_settings in dict_list_simple(Dataset_Settings)
+        @unpack dataset, posclass = dataset_settings
+        @info "Dataset: $(dataset), positive class label: $(posclass)"
+
+        labelmap = (y) -> y == posclass
+        (x_train, y_train), (x_test, y_test) = load(dataset; labelmap = labelmap) |> gpu
+
+        for train_settings in dict_list_simple(Train_Settings)
+            @unpack batchsize, epochs, runid = train_settings
+            @info "Batchsize: $(batchsize), runid: $(runid)"
+
+            epochlength = length(y_train) ÷ batchsize
+            iters = epochs * epochlength
+            make_batch = batch_provider(x_train, y_train, batchsize)
+
+
+            for model_settings in dict_list_simple(Model_Settings)
+                @unpack type, arg, surrogate, reg, buffer, seed = model_settings
+
+                    # create model
+                model = build_network(dataset; seed = seed) |> gpu
+                objective = build_loss(type, arg, surrogate, reg)
+                pars = params(model)
+
+                loss(x, y) = objective(x, y, model, pars)
+
+                # create callback
+                savefunc(c, x, y) = save_simulation(
+                    c,
+                    dataset_settings,
+                    train_settings,
+                    model_settings,
+                    model,
+                    x_train,
+                    y_train,
+                    x_test,
+                    y_test,
+                    x,
+                    y,
+                )
+
+                cb = CallBack(
+                    title = string(string(type), ": "),
+                    iters = iters,
+                    epochlength = epochlength;
+                    saveat = epochlength,
+                    savefunc = savefunc,
+                )
+
+                # training
+                @unpack optimiser, steplength = train_settings
+
+                batches = (make_batch(; buffer = buffer) for iter in 1:iters)
+                opt = optimiser(steplength)
+                custom_train!(loss, pars, batches, opt; cb = cb)
+            end
         end
     end
 end
