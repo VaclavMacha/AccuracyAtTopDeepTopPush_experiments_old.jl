@@ -7,22 +7,25 @@ using AccuracyAtTop
 # Models
 # -------------------------------------------------------------------------------
 abstract type Model end
+
+# Baseline model
 abstract type BaseLine <: Model end
 
-weights(x, y) = eltype(x).(y ./ sum(y .== 1) .+ (1 .- y) ./ sum(y .== 0))
+weights(y, s) = oftype(s, y ./ sum(y .== 1) .+ (1 .- y) ./ sum(y .== 0))
 
 @nograd weights
 
 function build_loss(::Type{BaseLine}, arg, surrogate, reg)
 
-    function loss(x, y, model, pars; w = weights(x, y))
+    function loss(x, y, model, pars)
         s = model(x)
+        w = weights(y, s)
         return binarycrossentropy(sigmoid.(s), y; agg = x -> sum(w .* x)) + eltype(x)(reg) * sum(sqsum, pars)
     end
     return loss
 end
 
-# threshold models
+# Threshold models
 abstract type DeepTopPush <: Model end
 abstract type PatMat <: Model end
 abstract type PatMatNP <: Model end
