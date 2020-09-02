@@ -6,6 +6,7 @@ using ValueHistories
 
 using Base.Iterators: partition
 using Flux.Optimise: runall, update!, StopException, batchmemaybe
+using Flux.Data: DataLoader
 using Zygote: Params, gradient
 
 
@@ -58,7 +59,7 @@ end
 # -------------------------------------------------------------------------------
 # Custom train!
 # -------------------------------------------------------------------------------
-function custom_train!(loss, ps, data, opt; cb = () -> ())
+function custom_train!(loss, ps, data, opt; cb = (args...) -> ())
   ps = Params(ps)
   cb = runall(cb)
 
@@ -91,9 +92,9 @@ Base.@kwdef mutable struct CallBack
     title::String = "Training:"
     bar::Progress = Progress(iters, 5, title)
     showat::Int = 100
-    showfunc::Function = (c) -> []
+    showfunc::Function = (args...) -> []
     saveat::Int = 1000
-    savefunc::Function = (c) -> nothing
+    savefunc::Function = (args...) -> nothing
     counter::Int = 0
     usershows = []
     loss = History(Float32)
@@ -154,12 +155,8 @@ function save_simulation(
     train_settings_in::Dict,
     model_settings::Dict,
     model,
-    x_train,
-    y_train,
-    x_test,
-    y_test,
-    x_mini,
-    y_mini,
+    x,
+    y,
 )
 
     train_settings = deepcopy(train_settings_in)
@@ -178,16 +175,8 @@ function save_simulation(
         :model => cpu(model),
         :loss => c.loss.values,
         :minibatch => Dict(
-            :targets => cpu(vec(y_mini)),
-            :scores => cpu(compute_scores(model, x_mini)),
-        ),
-        :train => Dict(
-            :targets => cpu(vec(y_train)),
-            :scores => cpu(compute_scores(model, x_train)),
-        ),
-        :test => Dict(
-            :targets => cpu(vec(y_test)),
-            :scores => cpu(compute_scores(model, x_test)),
+            :targets => cpu(vec(y)),
+            :scores => cpu(compute_scores(model, x)),
         ),
     )
 
@@ -234,7 +223,7 @@ function run_simulations(Dataset_Settings, Train_Settings, Model_Settings)
         @info "Dataset: $(dataset), positive class label: $(posclass)"
 
         labelmap = (y) -> y == posclass
-        (x_train, y_train), (x_test, y_test) = load(dataset; labelmap = labelmap) |> gpu
+        (x_train, y_train), (x_test, y_test) = load(dataset; labelmap = labelmap)
 
         for train_settings in dict_list_simple(Train_Settings)
             @unpack batchsize, epochs, runid = train_settings
@@ -262,10 +251,6 @@ function run_simulations(Dataset_Settings, Train_Settings, Model_Settings)
                     train_settings,
                     model_settings,
                     model,
-                    x_train,
-                    y_train,
-                    x_test,
-                    y_test,
                     x,
                     y,
                 )
@@ -279,12 +264,71 @@ function run_simulations(Dataset_Settings, Train_Settings, Model_Settings)
                 )
 
                 # training
-                @unpack optimiser, steplength = train_settings
+                @info "Bacth preparation:"
+                @time batches = [make_batch(; buffer = buffer) for iter in 1:epochlength] |> gpu
 
-                batches = (make_batch(; buffer = buffer) for iter in 1:iters)
+                @unpack optimiser, steplength = train_settings
                 opt = optimiser(steplength)
-                custom_train!(loss, pars, batches, opt; cb = cb)
+
+                for epoch in 1:epochs
+                    custom_train!(loss, pars, batches, opt; cb = cb)
+                end
             end
         end
     end
+end
+
+function run_evaluation(Dataset_Settings)
+    for dataset_settings in dict_list_simple(Dataset_Settings)
+        @unpack dataset, posclass = dataset_settings
+        @info "Dataset: $(dataset), positive class label: $(posclass)"
+
+        labelmap = (y) -> y == posclass
+        (x_train, y_train), (x_test, y_test) = load(dataset; labelmap = labelmap) |> gpu
+
+        dataset_dir = datadir(savename(dataset_settings; allowedtypes = allowedtypes()))
+        all_files = String[]
+        for (root, dirs, files) in walkdir(dataset_dir)
+            append!(all_files, joinpath.(root, files))
+        end
+
+        skipped_files = 0
+        overwritten_files = 0
+
+        @showprogress for file in all_files
+            # check if bson
+            if !endswith(file, ".bson")
+                skipped_files += 1
+                continue
+            end
+
+            # load and check if train and test samples are evaluated
+            simulation = BSON.load(file)
+            if haskey(simulation, :train) && haskey(simulation, :test)
+                skipped_files += 1
+                continue
+            end
+
+            # add train scores
+            model = simulation[:model] |> gpu
+            if !haskey(simulation, :train)
+                simulation[:train] = Dict(
+                    :targets => cpu(vec(y_train)),
+                    :scores => cpu(compute_scores(model, x_train)),
+                )
+            end
+            # add test scores
+            if !haskey(simulation, :test)
+                simulation[:test] = Dict(
+                    :targets => cpu(vec(y_test)),
+                    :scores => cpu(compute_scores(model, x_test)),
+                )
+            end
+            overwritten_files += 1
+            bson(file, simulation)
+        end
+        n = length(all_files)
+        @info "Skipped files: $(skipped_files)/$(n), overwritten files: $(overwritten_files)/$(n)"
+    end
+    return
 end
