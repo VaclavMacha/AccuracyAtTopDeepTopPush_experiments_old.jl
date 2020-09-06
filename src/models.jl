@@ -72,7 +72,6 @@ function build_loss(::Type{<:APPerf}, arg, surrogate, reg; admm_iter = 100)
     special_case_positive!(metric)
     cs_special_case_positive!(metric, false)
 
-
     function loss(x, y, model, pars)
         return loss(y, model(x), pars)
     end
@@ -82,3 +81,6 @@ function build_loss(::Type{<:APPerf}, arg, surrogate, reg; admm_iter = 100)
     end
     return loss
 end
+
+# TFCO model
+abstract type TFCO <: Model end
