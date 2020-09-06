@@ -14,12 +14,12 @@ include(srcdir("utilities.jl"))
 # Settings
 # ------------------------------------------------------------------------------------------
 Dataset_Settings = Dict(
-    :dataset => [FashionMNIST, CIFAR100],
-    :posclass => [0, 1]
+    :dataset => [FashionMNIST, CIFAR100, SVHN2Full],
+    :posclass => [0, 1, 1],
 )
 
-batchsize = [32]
-id = [1]
+batchsize = [32, 1000]
+id = 1:10
 
 Train_Settings = Dict(
     :batchsize => repeat(batchsize, outer=length(id)),
@@ -30,11 +30,11 @@ Train_Settings = Dict(
 )
 
 Model_Settings = Dict(
-    :type => APPerf,
-    :arg => [0.01, 0.05],
-    :surrogate => missing,
+    :type => [BaseLine, DeepTopPush, DeepTopPush, PatMatNP, PatMatNP],
+    :arg => [missing, missing, missing, 0.01, 0.05],
+    :surrogate => [missing, quadratic, quadratic, quadratic, quadratic],
     :reg => 1e-3,
-    :buffer => false,
+    :buffer => [false, true, false, false, false],
 )
 
 run_simulations(Dataset_Settings, Train_Settings, Model_Settings)
