@@ -162,3 +162,33 @@ function build_network(::Type{<:AbstractSVHN2}; seed = 1234)
         Dense(2048, 1)
     )
 end
+
+# -------------------------------------------------------------------------------
+# Molecules dataset
+# -------------------------------------------------------------------------------
+abstract type Molecules <: Dataset end
+
+function load_raw(::Type{Molecules}, T)
+    d = BSON.load(datadir("molecules.bson"))
+    train = (T.(Array(d[:train][:x]')), d[:train][:y])
+    test = (T.(Array(d[:test][:x]')), d[:test][:y])
+
+    return train, test
+end
+
+function load_activity(::Type{Molecules}, T)
+    d = BSON.load(datadir("molecules.bson"))
+    return T.(d[:train][:activity]), T.(d[:test][:activity])
+end
+
+function build_network(::Type{Molecules}; seed = 1234)
+    Random.seed!(seed)
+
+    return Chain(
+        Dense(100, 50, sigmoid),
+        BatchNorm(50, sigmoid),
+        Dense(50, 25, sigmoid),
+        BatchNorm(25, sigmoid),
+        Dense(25, 1)
+    )
+end
