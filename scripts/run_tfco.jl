@@ -6,6 +6,7 @@ using AccuracyAtTop, EvalMetrics
 include(srcdir("datasets.jl"))
 include(srcdir("models.jl"))
 include(srcdir("utilities.jl"))
+include(srcdir("evalutilities.jl"))
 include(srcdir("tfco.jl"))
 
 # ------------------------------------------------------------------------------------------
@@ -17,14 +18,14 @@ Dataset_Settings = Dict(
 )
 
 batchsize = [32, 1000]
-id = [1]
+seed = [1]
 
 Train_Settings = Dict(
-    :batchsize => repeat(batchsize, outer=length(id)),
+    :batchsize => repeat(batchsize, outer=length(seed)),
     :epochs => 200,
     :optimiser => Descent,
     :steplength => 0.0001,
-    :runid => repeat(id, inner=length(batchsize)),
+    :seed => repeat(seed, inner=length(batchsize)),
 )
 
 Model_Settings = Dict(
