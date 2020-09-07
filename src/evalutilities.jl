@@ -219,7 +219,7 @@ plts = []
             title = join([dataset_savename(dataset_settings), train_savename(train_settings)], "_")
 
             plt = plot(
-                plot_title(modeldir(dataset_settings, train_settings; agg = joinpath)),
+                plot_title(title),
                 m_train, m_test,
                 layout = @layout([A{0.01h}; B; C]),
                 size = (1000, 800),
@@ -251,8 +251,25 @@ end
 function plot_roccurve!(plt, d::Dict, key::Symbol; kwargs...)
     y = d[key][:targets]
     s = d[key][:scores]
-    rocplot!(plt, y, s; label = model_name(d), kwargs...)
+    plot_roccurve!(plt, s, y; label = model_name(d), kwargs...)
 end
+
+function plot_roccurve!(plt, s, y; label = "", kwargs...)
+    fprs = logrange(1e-5, 1; length = 298)
+    fprs = sort(vcat(fprs, 0.01, 0.05))
+    ts = threshold_at_fpr(y, s, fprs)
+
+    auc_score = auc_trapezoidal(roccurve(y, s))
+    auc_label = string.("auc: ", round.(100 * auc_score, digits = 2))
+
+    if isempty(label)
+        label = "auc: $(auc_label)"
+    else
+        label = string(label, " (auc: $(auc_label))")
+    end
+    plot!(plt, roccurve(y, s, ts); label = label, xlabel = "fpr", ylabel = "tpr",seriestype=:steppost, kwargs...)
+end
+
 
 model_name(d::Dict) = model_name(d[:model_settings][:type], d[:model_settings])
 function model_name(T::Type{<:Model}, d::Dict)
@@ -287,3 +304,7 @@ function plot_activity(y, a, s; title = "")
     scatter!(plt, s[pos], a[pos]; label = "positives", legend = :outertopright)
     return plt
 end
+
+
+
+logrange(x1, x2; kwargs...) = exp10.(range(log10(x1), log10(x2); kwargs...))
