@@ -171,6 +171,8 @@ function create_plots(
     Dataset_Settings,
     Train_Settings,
     Model_Settings;
+    save::Bool = false,
+    prefix = "",
     xscale = :log10,
     xlims = (1e-4, 1),
     kwargs...
@@ -186,10 +188,21 @@ plts = []
             m_test = plot(title = "Train"; kwargs...)
             args = []
             for model_settings in dict_list_simple(Model_Settings)
-                dir = modeldir(dataset_settings, train_settings, model_settings)
+                type = model_settings[:type]
+                if type <: TFCO || type <: APPerf
+                    train_settings_2 = deepcopy(train_settings)
+                    train_settings_2[:seed] = 1
+                else
+                    train_settings_2 = deepcopy(train_settings)
+                end
+
+                dir = modeldir(dataset_settings, train_settings_2, model_settings)
 
                 file = joinpath(dir, simulation_name(epochs))
-                isfile(file) || continue
+                if !isfile(file)
+                    @warn "File does not exist: $(file)"
+                    continue
+                end
 
                 d = BSON.load(file)
                 push!(args, d[:model_settings][:arg])
@@ -202,12 +215,37 @@ plts = []
             end
             plot!(m_train, title = "Train")
             plot!(m_test, title = "Test")
-            plt = plot(m_train, m_test, layout = (1,2), size = (1200, 400), legend = :outertopright)
-            display(plt)
+
+            title = join([dataset_savename(dataset_settings), train_savename(train_settings)], "_")
+
+            plt = plot(
+                plot_title(modeldir(dataset_settings, train_settings; agg = joinpath)),
+                m_train, m_test,
+                layout = @layout([A{0.01h}; B; C]),
+                size = (1000, 800),
+                legend = :outertopright
+            )
             push!(plts, plt)
+
+            if save
+                dir = plotsdir(dataset_savename(dataset_settings))
+                mkpath(dir)
+                if isempty(prefix)
+                    file_name = string(train_savename(train_settings), ".png")
+                else
+                    file_name = string(prefix, "_",  train_savename(train_settings), ".png")
+                end
+                savefig(plt, joinpath(dir, file_name))
+            else
+                display(plt)
+            end
         end
     end
     return plts
+end
+
+function plot_title(title)
+    return plot(title = title, grid = false, showaxis = false, titlefont=font(9))
 end
 
 function plot_roccurve!(plt, d::Dict, key::Symbol; kwargs...)
@@ -224,3 +262,28 @@ end
 model_args(::Type{<:Model}) = [:arg]
 model_args(::Type{BaseLine}) = []
 model_args(::Type{DeepTopPush}) = [:arg, :buffer]
+
+
+function plot_activity(file)
+    a_train, a_test = load_activity(Molecules, Float32)
+    (~, y_train), (~, y_test) = load(Molecules; labelmap = (y) -> y == 1)
+
+    d = BSON.load(file)
+    plt = plot(
+        plot_activity(y_train, a_train, d[:train][:scores]),
+        plot_activity(y_test, a_test, d[:test][:scores]),
+        legend = :outertopright,
+        size = (1000, 400),
+    )
+    display(plt)
+    return plt
+end
+
+function plot_activity(y, a, s; title = "")
+    neg = findall(vec(y) .== 0)
+    pos = findall(vec(y) .== 1)
+
+    plt = scatter(s[neg], a[neg]; xlabel = "scores", ylabel = "activity", title = title, label = "negatives")
+    scatter!(plt, s[pos], a[pos]; label = "positives", legend = :outertopright)
+    return plt
+end
