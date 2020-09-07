@@ -19,14 +19,14 @@ Dataset_Settings = Dict(
 )
 
 batchsize = [32]
-id = [1]
+seed = [1]
 
 Train_Settings = Dict(
-    :batchsize => repeat(batchsize, outer=length(id)),
+    :batchsize => repeat(batchsize, outer=length(seed)),
     :epochs => 200,
     :optimiser => Descent,
     :steplength => 0.0001,
-    :runid => repeat(id, inner=length(batchsize)),
+    :seed => repeat(seed, inner=length(batchsize)),
 )
 
 Model_Settings = Dict(
@@ -34,7 +34,7 @@ Model_Settings = Dict(
     :arg => [0.01, 0.05],
     :surrogate => missing,
     :reg => 1e-3,
-    :buffer => false,
+    :buffer => missing,
 )
 
 run_simulations(Dataset_Settings, Train_Settings, Model_Settings)
