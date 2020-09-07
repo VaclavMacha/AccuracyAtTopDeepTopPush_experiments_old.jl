@@ -156,9 +156,8 @@ function run_simulations_tfco(Dataset_Settings, Train_Settings, Model_Settings)
         (x_test, y_test) = reshape_for_python(test...);
 
         for train_settings in dict_list_simple(Train_Settings)
-            @unpack batchsize, epochs, runid, optimiser, steplength = train_settings
-            @info "Batchsize: $(batchsize), runid: $(runid)"
-            seed = runid
+            @unpack batchsize, epochs, seed, optimiser, steplength = train_settings
+            @info "Batchsize: $(batchsize), runid: $(seed)"
 
             for model_settings in dict_list_simple(Model_Settings)
                 @unpack type, arg, surrogate, reg, buffer = model_settings
