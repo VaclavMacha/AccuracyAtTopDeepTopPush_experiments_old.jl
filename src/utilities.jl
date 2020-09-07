@@ -28,17 +28,19 @@ function batch_provider(x, y, batchsize)
 
     last_batch = sample(1:batchsize, batchsize; replace = false)
 
-    function make_batch(; buffer::Bool = false)
+    function make_batch(; buffer = false)
         inds = vcat(
             sample(neg, n_neg; replace = length(neg) < n_neg),
             sample(pos, n_pos; replace = length(pos) < n_pos),
         )
-        if buffer
-            addind = AccuracyAtTop.BUFFER[].ind
-            if 0 < addind <= batchsize
-                inds[rand(1:batchsize)] = last_batch[addind]
+        if !ismissing(buffer)
+            if buffer
+                addind = AccuracyAtTop.BUFFER[].ind
+                if 0 < addind <= batchsize
+                    inds[rand(1:batchsize)] = last_batch[addind]
+                end
+                last_batch .= inds
             end
-            last_batch .= inds
         end
         return (getdim(x, x_obs, inds), getdim(y, y_obs, inds))
     end
@@ -149,12 +151,36 @@ end
 # -------------------------------------------------------------------------------
 allowedtypes(args...) = (Real, String, Symbol, DataType, Function, args...)
 
-function modeldir(dataset_settings, train_settings, model_settings; digits = 4)
-    datdir = savename(dataset_settings; allowedtypes = allowedtypes(), digits = digits)
-    traindir = savename(train_settings; allowedtypes = allowedtypes(), digits = digits)
-    moddir = savename(model_settings; allowedtypes = allowedtypes(), digits = digits)
+function dataset_savename(dataset_settings; digits = 4)
+    return savename(dataset_settings; allowedtypes = allowedtypes(), digits = digits)
+end
 
-    return datadir(datdir, traindir, moddir)
+function train_savename(train_settings_in; digits = 4)
+    train_settings = deepcopy(train_settings_in)
+    delete!(train_settings, :epochlength)
+    delete!(train_settings, :iters)
+    return savename(train_settings; allowedtypes = allowedtypes(), digits = digits)
+end
+
+function model_savename(model_settings_in; digits = 4)
+    model_settings = deepcopy(model_settings_in)
+    delete!(model_settings, :seed)
+    return savename(model_settings; allowedtypes = allowedtypes(), digits = digits)
+end
+
+function modeldir(
+    dataset_settings,
+    train_settings,
+    model_settings;
+    digits = 4,
+    agg = datadir,
+)
+
+    datdir = dataset_savename(dataset_settings; digits = digits)
+    traindir = train_savename(train_settings; digits = digits)
+    moddir = model_savename(model_settings; digits = digits)
+
+    return agg(datdir, traindir, moddir)
 end
 
 simulation_name(epoch) = string("model_epoch=", epoch, ".bson")
@@ -168,6 +194,8 @@ function save_simulation(
     x,
     y,
 )
+
+    savedir = modeldir(dataset_settings, train_settings_in, model_settings)
 
     train_settings = deepcopy(train_settings_in)
     train_settings[:epochs] = floor(Int, c.counter/c.epochlength)
@@ -195,10 +223,8 @@ function save_simulation(
     model_dict[:epochs] = simulation[:train_settings][:epochs]
     model_dict[:iters] = simulation[:train_settings][:iters]
 
-    savedir = modeldir(dataset_settings, train_settings, model_settings)
-
     isdir(savedir) || mkpath(savedir)
-    bson(joinpath(savedir, simul_name), simulation_name(train_settings[:epochs]))
+    bson(joinpath(savedir, simulation_name(train_settings[:epochs])), simulation)
     return
 end
 
@@ -210,6 +236,9 @@ function save_simulation_tfco(
     y_train,
     y_test,
 )
+
+    savedir = modeldir(dataset_settings, train_settings_in, model_settings)
+
     train_settings = deepcopy(train_settings_in)
     train_settings[:iters] = results["iters"]
     tm = results["tm"]
@@ -237,10 +266,8 @@ function save_simulation_tfco(
     model_dict[:epochs] = simulation[:train_settings][:epochs]
     model_dict[:iters] = simulation[:train_settings][:iters]
 
-    savedir = modeldir(dataset_settings, train_settings, model_settings)
-
     isdir(savedir) || mkpath(savedir)
-    bson(joinpath(savedir, simul_name), simulation_name(model_dict[:epochs]))
+    bson(joinpath(savedir, simulation_name(model_dict[:epochs])), simulation)
     return
 end
 
@@ -270,13 +297,12 @@ function run_simulations(Dataset_Settings, Train_Settings, Model_Settings)
         (x_train, y_train), (x_test, y_test) = load(dataset; labelmap = labelmap)
 
         for train_settings in dict_list_simple(Train_Settings)
-            @unpack batchsize, epochs, runid = train_settings
-            @info "Batchsize: $(batchsize), runid: $(runid)"
+            @unpack batchsize, epochs, seed = train_settings
+            @info "Batchsize: $(batchsize), seed: $(seed)"
 
             epochlength = length(y_train) ÷ batchsize
             iters = epochs * epochlength
             make_batch = batch_provider(x_train, y_train, batchsize)
-            seed = runid
 
             for model_settings in dict_list_simple(Model_Settings)
                 @unpack type, arg, surrogate, reg, buffer = model_settings
@@ -318,6 +344,66 @@ function run_simulations(Dataset_Settings, Train_Settings, Model_Settings)
                 for epoch in 1:epochs
                     custom_train!(loss, pars, batches, opt; cb = cb)
                 end
+            end
+        end
+    end
+end
+
+
+function run_simulations_buffer(Dataset_Settings, Train_Settings, Model_Settings)
+    for dataset_settings in dict_list_simple(Dataset_Settings)
+        @unpack dataset, posclass = dataset_settings
+        @info "Dataset: $(dataset), positive class label: $(posclass)"
+
+        labelmap = (y) -> y == posclass
+        (x_train, y_train), (x_test, y_test) = load(dataset; labelmap = labelmap) |> gpu
+
+        for train_settings in dict_list_simple(Train_Settings)
+            @unpack batchsize, epochs, seed = train_settings
+            @info "Batchsize: $(batchsize), seed: $(seed)"
+
+            epochlength = length(y_train) ÷ batchsize
+            iters = epochs * epochlength
+            make_batch = batch_provider(x_train, y_train, batchsize)
+
+            for model_settings in dict_list_simple(Model_Settings)
+                @unpack type, arg, surrogate, reg, buffer = model_settings
+                model_settings[:seed] = seed
+
+                # create model
+                model = build_network(dataset; seed = seed) |> gpu
+                objective = build_loss(type, arg, surrogate, reg)
+                pars = params(model)
+
+                loss(x, y) = objective(x, y, model, pars)
+
+                # create callback
+                savefunc(c, x, y) = save_simulation(
+                    c,
+                    dataset_settings,
+                    train_settings,
+                    model_settings,
+                    model,
+                    x,
+                    y,
+                )
+
+                cb = CallBack(
+                    title = string(string(type), ": "),
+                    iters = iters,
+                    epochlength = epochlength;
+                    saveat = epochlength,
+                    savefunc = savefunc,
+                )
+
+                # training
+                @info "Bacth preparation:"
+                @time batches = (make_batch(; buffer = buffer) for iter in 1:iters)
+
+                @unpack optimiser, steplength = train_settings
+                opt = optimiser(steplength)
+
+                custom_train!(loss, pars, batches, opt; cb = cb)
             end
         end
     end
