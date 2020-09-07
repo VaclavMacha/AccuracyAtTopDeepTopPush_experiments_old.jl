@@ -9,6 +9,7 @@ plotlyjs()
 include(srcdir("datasets.jl"))
 include(srcdir("models.jl"))
 include(srcdir("utilities.jl"))
+include(srcdir("evalutilities.jl"))
 
 # ------------------------------------------------------------------------------------------
 # Settings
@@ -19,22 +20,22 @@ Dataset_Settings = Dict(
 )
 
 batchsize = [32, 1000]
-id = 1:10
+seed = 1:10
 
 Train_Settings = Dict(
-    :batchsize => repeat(batchsize, outer=length(id)),
+    :batchsize => repeat(batchsize, outer=length(seed)),
     :epochs => 200,
     :optimiser => Descent,
     :steplength => 0.0001,
-    :runid => repeat(id, inner=length(batchsize)),
+    :seed => repeat(seed, inner=length(batchsize)),
 )
 
 Model_Settings = Dict(
-    :type => [BaseLine, DeepTopPush, DeepTopPush, PatMatNP, PatMatNP],
-    :arg => [missing, missing, missing, 0.01, 0.05],
-    :surrogate => [missing, quadratic, quadratic, quadratic, quadratic],
+    :type => [BaseLine, DeepTopPush, PatMatNP, PatMatNP],
+    :arg => [missing, missing, 0.01, 0.05],
+    :surrogate => [missing, quadratic, quadratic, quadratic],
     :reg => 1e-3,
-    :buffer => [false, true, false, false, false],
+    :buffer => [missing, false, missing, missing],
 )
 
 run_simulations(Dataset_Settings, Train_Settings, Model_Settings)
