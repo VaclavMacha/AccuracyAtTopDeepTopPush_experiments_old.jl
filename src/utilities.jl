@@ -15,7 +15,6 @@ using Zygote: Params, gradient
 # -------------------------------------------------------------------------------
 getdim(A::AbstractArray, d::Integer, i) = getindex(A, Base._setindex(i, d, axes(A)...)...)
 
-
 function batch_provider(x, y, batchsize)
     neg = findall(vec(y) .== 0)
     pos = findall(vec(y) .== 1)
@@ -33,11 +32,12 @@ function batch_provider(x, y, batchsize)
             sample(neg, n_neg; replace = length(neg) < n_neg),
             sample(pos, n_pos; replace = length(pos) < n_pos),
         )
+        shuffle!(inds)
         if !ismissing(buffer)
             if buffer
                 addind = AccuracyAtTop.BUFFER[].ind
                 if 0 < addind <= batchsize
-                    inds[rand(1:batchsize)] = last_batch[addind]
+                    inds[end] = last_batch[addind]
                 end
                 last_batch .= inds
             end
