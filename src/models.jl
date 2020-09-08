@@ -13,6 +13,7 @@ sqsum(x) = sum(abs2, x)
 
 # Baseline model
 abstract type BaseLine <: Model end
+abstract type BaseLineSimple <: Model end
 
 weights(y, s) = oftype(s, y ./ sum(y .== 1) .+ (1 .- y) ./ sum(y .== 0))
 
@@ -27,6 +28,18 @@ function build_loss(::Type{<:BaseLine}, arg, surrogate, reg)
     function loss(y, s, pars)
         w = weights(y, s)
         return binarycrossentropy(sigmoid.(s), y; agg = x -> sum(w .* x)) + eltype(s)(reg) * sum(sqsum, pars)
+    end
+    return loss
+end
+
+function build_loss(::Type{<:BaseLineSimple}, arg, surrogate, reg)
+
+    function loss(x, y, model, pars)
+        return loss(y, model(x), pars)
+    end
+
+    function loss(y, s, pars)
+        return binarycrossentropy(sigmoid.(s), y) + eltype(s)(reg) * sum(sqsum, pars)
     end
     return loss
 end
