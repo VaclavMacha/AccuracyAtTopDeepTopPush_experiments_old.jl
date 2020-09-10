@@ -1,19 +1,14 @@
 # AccuracyAtTop_aaai
 
-This code base is using the Julia Language and [DrWatson](https://juliadynamics.github.io/DrWatson.jl/stable/)
-to make a reproducible scientific project named
-> AccuracyAtTop_aaai
+This repository is a complementary material to our paper *[DeepTopPush: Simple and Scalable Method for Accuracy at the Top]()*. This paper was submitted to the [AAAI Conference on Artificial Intelligence](https://aaai.org/Conferences/AAAI-21/).
 
-To (locally) reproduce this project, do the following:
+# Running the codes
 
-0. Download this code base. Notice that raw data are typically not included in the
-   git-history and may need to be downloaded independently.
-1. Open a Julia console and do:
-   ```
-   julia> using Pkg
-   julia> Pkg.activate("path/to/this/project")
-   julia> Pkg.instantiate()
-   ```
+All required packages are listed in the `Project.toml` file. Before running any of provided scripts, go to the project directory and from the Pkg REPL run the following commands
+```julia
+(@v1.5) pkg> activate .
+(AccuracyAtTop_aaai) pkg> instantiate
+```
+For more information see the [manual.](https://julialang.github.io/Pkg.jl/v1/environments/#Using-someone-else's-project-1)
 
-This will install all necessary packages for you to be able to run the scripts and
-everything should work out of the box.
+The repository consists of two folders. The `src` folder contains the auxiliary functions needed for experiments, and the `scripts` folder contains scripts for all experiments. Only files which name starts with `run_*` contains the experiments. The rest of the files are used to visualize and export the results.
