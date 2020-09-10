@@ -56,6 +56,16 @@ def build_model_svhn2():
     ])
 
 
+def build_model_molecules():
+    return tf.keras.Sequential([
+        tf.keras.layers.Dense(50, input_shape=(100,), activation='sigmoid'),
+        tf.keras.layers.BatchNormalization(),
+        tf.keras.layers.Dense(25, activation='sigmoid'),
+        tf.keras.layers.BatchNormalization(),
+        tf.keras.layers.Dense(1),
+    ])
+
+
 def make_model_fn(build_model, fpr, optimizer, steplength):
     def model_fn(features, labels, mode):
         model = build_model()
@@ -138,6 +148,7 @@ def train_model(build_model, x_train, y_train, x_test, y_test, args, model_dir):
 build_network_tfco(::Type{<:AbstractMNIST}) = py"build_model_mnist"
 build_network_tfco(::Type{<:AbstractCIFAR}) = py"build_model_cifar"
 build_network_tfco(::Type{<:AbstractSVHN2}) = py"build_model_svhn2"
+build_network_tfco(::Type{<:Molecules}) = py"build_model_molecules"
 
 function reshape_for_python(x, y)
     d = ndims(x)
@@ -145,7 +156,7 @@ function reshape_for_python(x, y)
 end
 
 function run_simulations_tfco(Dataset_Settings, Train_Settings, Model_Settings)
-    model_dir = mktempdir(".")
+    model_dir = mktempdir("."; cleanup=false)
     for dataset_settings in dict_list_simple(Dataset_Settings)
         @unpack dataset, posclass = dataset_settings
         @info "Dataset: $(dataset), positive class label: $(posclass)"
@@ -176,7 +187,7 @@ function run_simulations_tfco(Dataset_Settings, Train_Settings, Model_Settings)
                     :optimiser => optm,
                     :steplength => steplength,
                     :batchsize => batchsize,
-                    :epochs => epochs,
+                    :epochs => epochs
                 )
 
                 build_net = build_network_tfco(dataset)
