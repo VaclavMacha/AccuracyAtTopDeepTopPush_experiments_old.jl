@@ -1,31 +1,23 @@
 using DrWatson
 @quickactivate "AccuracyAtTop_aaai"
 
-using AccuracyAtTop, EvalMetrics
-
-include(srcdir("datasets.jl"))
-include(srcdir("models.jl"))
 include(srcdir("utilities.jl"))
-include(srcdir("evalutilities.jl"))
 include(srcdir("tfco.jl"))
 
 # ------------------------------------------------------------------------------------------
 # Settings
 # ------------------------------------------------------------------------------------------
 Dataset_Settings = Dict(
-    :dataset => [FashionMNIST, CIFAR100],
-    :posclass => [0, 1]
+    :dataset => [FashionMNIST, CIFAR100, SVHN2Full, Molecules],
+    :posclass => [0, 1, 1, 1],
 )
 
-batchsize = [32, 1000]
-seed = [1]
-
 Train_Settings = Dict(
-    :batchsize => repeat(batchsize, outer=length(seed)),
+    :batchsize => 32,
     :epochs => 200,
     :optimiser => Descent,
     :steplength => 0.0001,
-    :seed => repeat(seed, inner=length(batchsize)),
+    :seed => collect(1:10),
 )
 
 Model_Settings = Dict(
@@ -33,7 +25,7 @@ Model_Settings = Dict(
     :arg => [0.01, 0.05],
     :surrogate => missing,
     :reg => 1e-3,
-    :buffer => false,
+    :buffer => missing,
 )
 
 run_simulations_tfco(Dataset_Settings, Train_Settings, Model_Settings)

@@ -1,36 +1,26 @@
 using DrWatson
 @quickactivate "AccuracyAtTop_aaai"
 
-using AccuracyAtTop, EvalMetrics, Plots, Flux, CUDA
-using Flux: gpu
-
-plotlyjs()
-
-include(srcdir("datasets.jl"))
-include(srcdir("models.jl"))
 include(srcdir("utilities.jl"))
 
 # ------------------------------------------------------------------------------------------
 # Settings
 # ------------------------------------------------------------------------------------------
 Dataset_Settings = Dict(
-    :dataset => [FashionMNIST, CIFAR100],
-    :posclass => [0, 1]
+    :dataset => [FashionMNIST, CIFAR100, Molecules],
+    :posclass => [0, 1, 1],
 )
 
-batchsize = [32]
-seed = [1]
-
 Train_Settings = Dict(
-    :batchsize => repeat(batchsize, outer=length(seed)),
+    :batchsize => 32,
     :epochs => 200,
     :optimiser => Descent,
     :steplength => 0.0001,
-    :seed => repeat(seed, inner=length(batchsize)),
+    :seed => 1,
 )
 
 Model_Settings = Dict(
-    :type => APPerf,
+    :type => [APPerf, APPerf],
     :arg => [0.01, 0.05],
     :surrogate => missing,
     :reg => 1e-3,

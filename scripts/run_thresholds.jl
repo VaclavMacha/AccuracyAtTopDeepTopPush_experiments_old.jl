@@ -1,16 +1,7 @@
 using DrWatson
 @quickactivate "AccuracyAtTop_aaai"
 
-using AccuracyAtTop, EvalMetrics, Plots, Flux, CUDA
-using Flux: gpu
-
-# plotlyjs()
-pyplot() # for savefig
-
-include(srcdir("datasets.jl"))
-include(srcdir("models.jl"))
 include(srcdir("utilities.jl"))
-include(srcdir("evalutilities.jl"))
 
 # ------------------------------------------------------------------------------------------
 # Settings
@@ -80,7 +71,7 @@ BSON.bson(datadir("thresholds.bson"), Dict(:history => history))
 plt = plot(
     xlabel = "iteration",
     ylabel = "threshold",
-    title = "$(dataset): batchsize = $(batchsize)",
+    title = "$(dataset): batchsize = $(batch_size)",
     legend = :outertopright,
     size = (1000, 400),
 )
