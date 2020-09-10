@@ -1,3 +1,5 @@
+using Flux
+
 using Flux: params, sigmoid
 using Flux.Losses: binarycrossentropy
 using Zygote: @nograd

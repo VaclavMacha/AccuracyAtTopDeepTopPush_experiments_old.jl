@@ -1,7 +1,49 @@
+using CSV
+using DataFrames
+using DataFramesMeta
+using EvalMetrics
+using Plots
+using Statistics
+
+pyplot()
+
 using ProgressMeter: Progress, next!
 
-extract_model_type(d::Dict) = d[:model_settings][:type]
+# -------------------------------------------------------------------------------
+# Eval functions
+# -------------------------------------------------------------------------------
+function tpr_at_fpr(targets, scores, rate)
+    t = threshold_at_fpr(targets, scores, rate)
+    return true_positive_rate(targets, scores, t)
+end
 
+function tpr_at_top(targets, scores)
+    t = maximum(scores[targets .== 0])
+    return true_positive_rate(targets, scores, t)
+end
+
+function tpr_at_top(targets, scores)
+    t = maximum(scores[targets .== 0])
+    return true_positive_rate(targets, scores, t)
+end
+
+function partial_auroc(targets, scores, fprmax)
+    rates = logrange(1e-5, fprmax; length=1000)
+    ts = unique(threshold_at_fpr(targets, scores, rates))
+
+    fprs = false_positive_rate(targets, scores, ts)
+    inds = unique(i -> fprs[i], 1:length(fprs))
+    fprs = fprs[inds]
+    tprs = true_positive_rate(targets, scores, ts[inds])
+
+    auc_max = abs(maximum(fprs) - minimum(fprs))
+
+    return 100*EvalMetrics.auc_trapezoidal(fprs, tprs)/auc_max
+end
+
+# -------------------------------------------------------------------------------
+# Compute evaluation and add it to existing model files
+# -------------------------------------------------------------------------------
 function add_targets_scores(file::String, train::Tuple, test::Tuple)
     if !endswith(file, ".bson")
         return false
@@ -93,41 +135,8 @@ function add_metrics!(d, key::Symbol)
         d[key][:auroc_5] = partial_auroc(targets, scores, 0.05)
         overwrite = true
     end
-
     return overwrite
 end
-
-function tpr_at_fpr(targets, scores, rate)
-    t = threshold_at_fpr(targets, scores, rate)
-    return true_positive_rate(targets, scores, t)
-end
-
-function tpr_at_top(targets, scores)
-    t = maximum(scores[targets .== 0])
-    return true_positive_rate(targets, scores, t)
-end
-
-function tpr_at_top(targets, scores)
-    t = maximum(scores[targets .== 0])
-    return true_positive_rate(targets, scores, t)
-end
-
-logrange(x1, x2; kwargs...) = exp10.(range(log10(x1), log10(x2); kwargs...))
-
-function partial_auroc(targets, scores, fprmax)
-    rates = logrange(1e-5, fprmax; length=1000)
-    ts = unique(threshold_at_fpr(targets, scores, rates))
-
-    fprs = false_positive_rate(targets, scores, ts)
-    inds = unique(i -> fprs[i], 1:length(fprs))
-    fprs = fprs[inds]
-    tprs = true_positive_rate(targets, scores, ts[inds])
-
-    auc_max = abs(maximum(fprs) - minimum(fprs))
-
-    return 100*EvalMetrics.auc_trapezoidal(fprs, tprs)/auc_max
-end
-
 
 function run_evaluation(Dataset_Settings)
     for dataset_settings in dict_list_simple(Dataset_Settings)
@@ -137,7 +146,7 @@ function run_evaluation(Dataset_Settings)
         labelmap = (y) -> y == posclass
         train, test = load(dataset; labelmap = labelmap) |> gpu
 
-        dataset_dir = datadir(savename(dataset_settings; allowedtypes = allowedtypes()))
+        dataset_dir = datadir("models", dataset_savename(dataset_settings))
         all_files = String[]
         for (root, dirs, files) in walkdir(dataset_dir)
             append!(all_files, joinpath.(root, files))
@@ -178,7 +187,7 @@ function create_plots(
     kwargs...
 )
 
-plts = []
+    plts = []
     for dataset_settings in dict_list_simple(Dataset_Settings)
         @unpack dataset = dataset_settings
         for train_settings in dict_list_simple(Train_Settings)
@@ -270,17 +279,6 @@ function plot_roccurve!(plt, s, y; label = "", kwargs...)
     plot!(plt, roccurve(y, s, ts); label = label, xlabel = "fpr", ylabel = "tpr",seriestype=:steppost, kwargs...)
 end
 
-
-model_name(d::Dict) = model_name(d[:model_settings][:type], d[:model_settings])
-function model_name(T::Type{<:Model}, d::Dict)
-    vals = [string(d[key]) for key in model_args(T)]
-    return string(T, "(", join(vals, ", "), ")")
-end
-model_args(::Type{<:Model}) = [:arg]
-model_args(::Type{BaseLine}) = []
-model_args(::Type{DeepTopPush}) = [:arg, :buffer]
-
-
 function plot_activity(file)
     a_train, a_test = load_activity(Molecules, Float32)
     (~, y_train), (~, y_test) = load(Molecules; labelmap = (y) -> y == 1)
@@ -305,6 +303,153 @@ function plot_activity(y, a, s; title = "")
     return plt
 end
 
+# ------------------------------------------------------------------------------------------
+# Collecting results...
+# ------------------------------------------------------------------------------------------
+function add_missing!(d)
+    get!(d, :dataset, missing)
+    get!(d, :posclass, missing)
+    get!(d, :batchsize, missing)
+    get!(d, :iters, missing)
+    get!(d, :optimiser, missing)
+    get!(d, :steplength, missing)
+    get!(d, :type, missing)
+    get!(d, :arg, missing)
+    get!(d, :surrogate, missing)
+    get!(d, :reg, missing)
+    get!(d, :buffer, missing)
+end
+
+function collect_benchmark(path = datadir("benchmarks"); save = true)
+    dfs = []
+    for (root, dirs, files) in walkdir(path)
+        for file in files
+            fl = joinpath(root, file)
+            dir_rel = relpath(fl, path)
+            ~, bench = parse_savename(replace(dir_rel, "/" => "_"))
+            bench = Dict(Symbol(key) => val for (key, val) in bench)
+
+            d = BSON.load(fl)
+            add_missing!(bench)
+            bench[:time_per_epoch] = mean(d[:times])/d[:iters_in_run]*d[:epochlength]
+            push!(dfs, DataFrame(bench))
+        end
+    end
+    df = reduce(vcat, dfs)
+    select!(df, Not(["arg", "iters", "optimiser", "posclass", "reg", "steplength", "surrogate"]))
+    df = df[["dataset", "batchsize", "type", "buffer", "time_per_epoch"]]
+    rename!(df, "type" => "model")
+    if save
+        mkpath(datadir("results"))
+        CSV.write(datadir("results", "benchmarks.csv"), df)
+    end
+    return df
+end
+
+err(x) = std(x; corrected = false)
 
 
-logrange(x1, x2; kwargs...) = exp10.(range(log10(x1), log10(x2); kwargs...))
+function collect_metrics(path = datadir("models"); key::Symbol = :test, epochs = 200, save = true)
+    dfs = []
+    for (root, dirs, files) in walkdir(path)
+        for file in files
+            contains(file, string(epochs)) || continue
+            fl = joinpath(root, file)
+            dir_rel = relpath(root, path)
+            ~, dict = parse_savename(replace(dir_rel, "/" => "_"))
+            dict = Dict(Symbol(key) => val for (key, val) in dict)
+            add_missing!(dict)
+
+            d = BSON.load(fl)
+            dict[:tpr_at_top] = d[key][:tpr_at_top]
+            dict[:tpr_at_fpr_1] = d[key][:tpr_at_fpr_1]
+            dict[:tpr_at_fpr_5] = d[key][:tpr_at_fpr_5]
+            dict[:auroc_1] = d[key][:auroc_1]
+            dict[:auroc_5] = d[key][:auroc_5]
+            push!(dfs, DataFrame(dict))
+        end
+    end
+    df = reduce(vcat, dfs)
+    select!(df, Not(["seed", "iters", "optimiser", "posclass", "reg", "steplength", "surrogate"]))
+    rename!(df, "type" => "model")
+
+    gdf = groupby(df, ["arg", "batchsize", "buffer", "dataset", "epochs", "model"])
+    combs = [
+        "auroc_1" => mean,
+        "auroc_1" => err,
+        "auroc_5" => mean,
+        "auroc_5" => err,
+        "tpr_at_fpr_1" => mean,
+        "tpr_at_fpr_1" => err,
+        "tpr_at_fpr_5" => mean,
+        "tpr_at_fpr_5" => err,
+        "tpr_at_top" => mean,
+        "tpr_at_top" => err
+    ]
+    df2 = combine(gdf, combs)
+
+    if save
+        mkpath(datadir("results"))
+        CSV.write(datadir("results", "metrics.csv"), df2)
+    end
+    return df2
+end
+
+
+function collect_curves(
+    dataset_settings,
+    train_settings,
+    Model_Settings;
+    key = :train,
+    epochs = 200,
+    xlims = (1e-4, 1),
+    npoints = 300,
+)
+
+    rates = logrange(xlims...; length = npoints - 1)
+    rates = sort(vcat(rates, 0.01, 0.05))
+    df = DataFrame()
+
+    for model_settings in dict_list_simple(Model_Settings)
+        files = String[]
+        for seed in 1:10
+            train_settings[:seed] = seed
+            dir = modeldir(dataset_settings, train_settings, model_settings)
+            file = joinpath(dir, simulation_name(epochs))
+            isfile(file) || continue
+            push!(files, file)
+        end
+
+        fprs = zeros(length(rates))
+        tprs = zeros(length(rates))
+
+        for file in files
+            d = BSON.load(file)
+            y = d[key][:targets]
+            s = d[key][:scores]
+            ts = threshold_at_fpr(y, s, rates)
+            fp, tp = roccurve(y, s, ts)
+
+            fprs .+= fp
+            tprs .+= tp
+        end
+        fprs ./= length(files)
+        tprs ./= length(files)
+
+        @unpack arg, type = model_settings
+        mdl = ismissing(arg) ? string(type) : "$(type)($(arg))"
+        df["$(mdl)_fprates"] = fprs
+        df["$(mdl)_tprates"] = tprs
+    end
+    delete!(dataset_settings, :posclass)
+    delete!(train_settings, :seed)
+    delete!(train_settings, :seed)
+    delete!(train_settings, :optimiser)
+    delete!(train_settings, :epochs)
+    delete!(train_settings, :steplength)
+
+    sett = merge(dataset_settings, train_settings)
+    filename = savename(sett; allowedtypes = allowedtypes(), digits = 4)
+    CSV.write(datadir("results", string(filename, "_$(key).csv")), df)
+    return
+end
