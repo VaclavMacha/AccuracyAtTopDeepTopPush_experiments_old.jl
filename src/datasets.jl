@@ -2,7 +2,10 @@ using Flux
 using MLDataPattern
 using Random
 
+using Flux: flatten
 import MLDatasets
+
+datasetdir(args...) = projectdir("datasets", args...)
 
 # -------------------------------------------------------------------------------
 # Utility functions
@@ -169,7 +172,7 @@ end
 abstract type Molecules <: Dataset end
 
 function load_raw(::Type{Molecules}, T)
-    d = BSON.load(datadir("molecules.bson"))
+    d = BSON.load(datasetdir("molecules.bson"))
     train = (T.(Array(d[:train][:x]')), d[:train][:y])
     test = (T.(Array(d[:test][:x]')), d[:test][:y])
 
@@ -177,7 +180,7 @@ function load_raw(::Type{Molecules}, T)
 end
 
 function load_activity(::Type{Molecules}, T)
-    d = BSON.load(datadir("molecules.bson"))
+    d = BSON.load(datasetdir("molecules.bson"))
     return T.(d[:train][:activity]), T.(d[:test][:activity])
 end
 
