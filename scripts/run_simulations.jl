@@ -6,9 +6,14 @@ include(srcdir("utilities.jl"))
 # ------------------------------------------------------------------------------------------
 # Settings
 # ------------------------------------------------------------------------------------------
+# Dataset_Settings = Dict(
+#     :dataset => [FashionMNIST, CIFAR100, SVHN2Full, Molecules, ImageNet],
+#     :posclass => [0, 1, 1, 1, 1],
+# )
+
 Dataset_Settings = Dict(
-    :dataset => [FashionMNIST, CIFAR100, SVHN2Full, Molecules],
-    :posclass => [0, 1, 1, 1],
+    :dataset => [ImageNet],
+    :posclass => [1],
 )
 
 Train_Settings = Dict(
@@ -29,3 +34,5 @@ Model_Settings = Dict(
 
 run_simulations(Dataset_Settings, Train_Settings, Model_Settings)
 run_evaluation(Dataset_Settings)
+
+@info "All simulations finished"

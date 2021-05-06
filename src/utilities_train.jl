@@ -234,7 +234,7 @@ function run_simulations(Dataset_Settings, Train_Settings, Model_Settings)
         @info "Dataset: $(dataset), positive class label: $(posclass)"
 
         labelmap = (y) -> y == posclass
-        (x_train, y_train), (x_test, y_test) = load(dataset; labelmap = labelmap) |> gpu
+        (x_train, y_train), (x_test, y_test) = load(dataset; labelmap = labelmap)
 
         for train_settings in dict_list_simple(Train_Settings)
             @unpack batchsize, epochs, seed = train_settings
@@ -277,7 +277,7 @@ function run_simulations(Dataset_Settings, Train_Settings, Model_Settings)
                 # training
                 @info "Bacth preparation:"
                 Random.seed!(seed)
-                batches = (make_batch(; buffer = buffer) for iter in 1:iters)
+                batches = (gpu(make_batch(; buffer = buffer)) for iter in 1:iters)
 
                 @unpack optimiser, steplength = train_settings
                 opt = optimiser(steplength)
@@ -294,7 +294,7 @@ function run_benchmark(Dataset_Settings, Train_Settings, Model_Settings)
         @info "Dataset: $(dataset), positive class label: $(posclass)"
 
         labelmap = (y) -> y == posclass
-        (x_train, y_train), ~ = load(dataset; labelmap = labelmap) |> gpu
+        (x_train, y_train), ~ = load(dataset; labelmap = labelmap)
 
 
         for train_settings in dict_list_simple(Train_Settings)
@@ -316,7 +316,7 @@ function run_benchmark(Dataset_Settings, Train_Settings, Model_Settings)
 
                 # training
                 @info "Model: $(type)"
-                batches = [make_batch(; buffer = buffer) for iter in 1:iters] |> gpu
+                batches = [gpu(make_batch(; buffer = buffer)) for iter in 1:iters] |> gpu
 
                 @unpack optimiser, steplength = train_settings
                 opt = optimiser(steplength)

@@ -5,7 +5,7 @@ using Random
 using Flux: flatten
 import MLDatasets
 
-datasetdir(args...) = projectdir("datasets", args...)
+datasetdir(args...) = joinpath("/disk/macha/data_aaai/datasets", args...)
 
 # -------------------------------------------------------------------------------
 # Utility functions
@@ -146,6 +146,44 @@ function load_raw(::Type{SVHN2Full}, T)
 end
 
 function build_network(::Type{<:AbstractSVHN2}; seed = 1234)
+    Random.seed!(seed)
+
+    return Chain(
+        # First convolution, operating upon a 32x32 image
+        Conv((3, 3), 3=>64, pad=(1,1), relu),
+        MaxPool((2,2)),
+
+        # Second convolution, operating upon a 16x16 image
+        Conv((3, 3), 64=>128, pad=(1,1), relu),
+        MaxPool((2,2)),
+
+        # Third convolution, operating upon a 4x4 image
+        Conv((3, 3), 128=>128, pad=(1,1), relu),
+        MaxPool((2,2)),
+
+        flatten,
+        Dense(2048, 1)
+    )
+end
+
+# -------------------------------------------------------------------------------
+# ImageNet dataset
+# -------------------------------------------------------------------------------
+import FileIO
+using JLD2
+
+abstract type ImageNet <: Dataset end
+
+function load_raw(::Type{ImageNet}, T)
+    d_train = FileIO.load(datasetdir("imagenet", "train.jld2"))
+    d_test = FileIO.load(datasetdir("imagenet", "valid.jld2"))
+    train = (T.(d_train["x"])./256, d_train["y"])
+    test = (T.(d_test["x"])./256, d_test["y"])
+
+    return train, test
+end
+
+function build_network(::Type{<:ImageNet}; seed = 1234)
     Random.seed!(seed)
 
     return Chain(
