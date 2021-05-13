@@ -55,6 +55,10 @@ def build_model_svhn2():
         tf.keras.layers.Dense(1),
     ])
 
+def build_model_imagenet():
+    return tf.keras.Sequential([
+        tf.keras.layers.Dense(1, input_shape=(10240,)),
+    ])
 
 def build_model_molecules():
     return tf.keras.Sequential([
@@ -149,6 +153,9 @@ build_network_tfco(::Type{<:AbstractMNIST}) = py"build_model_mnist"
 build_network_tfco(::Type{<:AbstractCIFAR}) = py"build_model_cifar"
 build_network_tfco(::Type{<:AbstractSVHN2}) = py"build_model_svhn2"
 build_network_tfco(::Type{<:Molecules}) = py"build_model_molecules"
+build_network_tfco(::Type{<:ImageNet}) = py"build_model_cifar"
+build_network_tfco(::Type{<:ImageNetPrep}) = py"build_model_imagenet"
+
 
 function reshape_for_python(x, y)
     d = ndims(x)
