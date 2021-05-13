@@ -205,6 +205,40 @@ function build_network(::Type{<:ImageNet}; seed = 1234)
 end
 
 # -------------------------------------------------------------------------------
+# ImageNetPrep dataset
+# -------------------------------------------------------------------------------
+abstract type Dataset end
+abstract type ImageNetPrep <: Dataset end
+
+function load_raw(::Type{ImageNetPrep}, T)
+    x = zeros(T, 10240, 1281167)
+    y = zeros(Int, 1281167)
+    ind = 1
+    for i in 1:10
+        @info "Loading $(i)/10"
+        d_train = FileIO.load(datasetdir("imagenet_64_prep", "train_$(i).jld2"))
+
+        inds = ind:(ind + length(d_train["y"]) - 1)
+        ind += length(d_train["y"])
+        x[:, inds] .= d_train["x"]
+        y[inds] .= d_train["y"]
+    end
+
+    d_test = FileIO.load(datasetdir("imagenet_64_prep", "valid.jld2"))
+    test = (T.(d_test["x"]), d_test["y"])
+
+    return (x, y), test
+end
+
+function build_network(::Type{<:ImageNetPrep}; seed = 1234)
+    Random.seed!(seed)
+
+    return Chain(
+        Dense(10240, 1)
+    )
+end
+
+# -------------------------------------------------------------------------------
 # Molecules dataset
 # -------------------------------------------------------------------------------
 abstract type Molecules <: Dataset end
