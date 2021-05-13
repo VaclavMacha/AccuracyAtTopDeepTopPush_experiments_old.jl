@@ -12,13 +12,13 @@ DrWatson.datadir(args...) = joinpath("/disk/macha/data_aaai", args...)
 # -------------------------------------------------------------------------------
 getdim(A::AbstractArray, d::Integer, i) = getindex(A, Base._setindex(i, d, axes(A)...)...)
 
-function compute_scores(model, x; chunksize = 10000)
+function compute_scores(model, x; chunksize = 10000, device = identity)
     x_obs = ndims(x)
     n = size(x, x_obs)
     scores = zeros(eltype(x), n)
 
     for inds in partition(1:n, chunksize)
-        scores[inds] .= model(getdim(x, x_obs, inds))[:]
+        scores[inds] .= model(device(getdim(x, x_obs, inds)))[:]
     end
     return scores
 end

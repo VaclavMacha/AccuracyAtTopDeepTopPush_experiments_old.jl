@@ -44,14 +44,14 @@ end
 # -------------------------------------------------------------------------------
 # Compute evaluation and add it to existing model files
 # -------------------------------------------------------------------------------
-function add_targets_scores(file::String, train::Tuple, test::Tuple)
+function add_targets_scores(file::String, train::Tuple, test::Tuple; device = identity)
     if !endswith(file, ".bson")
         return false
     end
 
     d = BSON.load(file)
-    overwrite1 = add_targets_scores!(d, train..., :train)
-    overwrite2 = add_targets_scores!(d, test..., :test)
+    overwrite1 = add_targets_scores!(d, train..., :train; device)
+    overwrite2 = add_targets_scores!(d, test..., :test; device)
     overwrite3 = add_loss!(d, :minibatch)
     overwrite4 = add_metrics!(d, :train)
     overwrite5 = add_metrics!(d, :test)
@@ -61,7 +61,7 @@ function add_targets_scores(file::String, train::Tuple, test::Tuple)
     return overwrite
 end
 
-function add_targets_scores!(d::Dict, x, y, key::Symbol)
+function add_targets_scores!(d::Dict, x, y, key::Symbol; device = identity)
     overwrite = false
     if haskey(d, key)
         if !haskey(d[key], :targets)
@@ -70,14 +70,14 @@ function add_targets_scores!(d::Dict, x, y, key::Symbol)
         end
         if !haskey(d[key], :scores)
             model = d[:model] |> gpu
-            d[key][:scores] = cpu(compute_scores(model, x))
+            d[key][:scores] = cpu(compute_scores(model, x; device))
             overwrite = true
         end
     else
         model = d[:model] |> gpu
         d[key] = Dict(
             :targets => cpu(vec(y)),
-            :scores => cpu(compute_scores(model, x)),
+            :scores => cpu(compute_scores(model, x; device)),
         )
         overwrite = true
     end
@@ -144,7 +144,7 @@ function run_evaluation(Dataset_Settings)
         @info "Dataset: $(dataset), positive class label: $(posclass)"
 
         labelmap = (y) -> y == posclass
-        train, test = load(dataset; labelmap = labelmap) |> gpu
+        train, test = load(dataset; labelmap = labelmap)
 
         dataset_dir = datadir("models", dataset_savename(dataset_settings))
         all_files = String[]
@@ -158,7 +158,7 @@ function run_evaluation(Dataset_Settings)
         for file in all_files
             overwrite = false
             try
-                overwrite = add_targets_scores(file, train, test)
+                overwrite = add_targets_scores(file, train, test; device = gpu)
             catch
                 @warn "Problem with: $file"
             end
