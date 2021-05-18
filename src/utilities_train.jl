@@ -228,12 +228,12 @@ end
 # -------------------------------------------------------------------------------
 # Runing simulations
 # -------------------------------------------------------------------------------
-function run_simulations(Dataset_Settings, Train_Settings, Model_Settings)
+function run_simulations(Dataset_Settings, Train_Settings, Model_Settings; nepochs_save = 1)
     for dataset_settings in dict_list_simple(Dataset_Settings)
         @unpack dataset, posclass = dataset_settings
         @info "Dataset: $(dataset), positive class label: $(posclass)"
 
-        labelmap = (y) -> y == posclass
+        labelmap(y) = y in posclass
         (x_train, y_train), (x_test, y_test) = load(dataset; labelmap = labelmap)
 
         for train_settings in dict_list_simple(Train_Settings)
@@ -270,7 +270,7 @@ function run_simulations(Dataset_Settings, Train_Settings, Model_Settings)
                     title = string(string(type), ": "),
                     iters = iters,
                     epochlength = epochlength;
-                    saveat = epochlength,
+                    saveat = nepochs_save * epochlength,
                     savefunc = savefunc,
                 )
 

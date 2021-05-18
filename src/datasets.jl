@@ -207,7 +207,6 @@ end
 # -------------------------------------------------------------------------------
 # ImageNetPrep dataset
 # -------------------------------------------------------------------------------
-abstract type Dataset end
 abstract type ImageNetPrep <: Dataset end
 
 function load_raw(::Type{ImageNetPrep}, T)

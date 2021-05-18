@@ -143,7 +143,7 @@ function run_evaluation(Dataset_Settings)
         @unpack dataset, posclass = dataset_settings
         @info "Dataset: $(dataset), positive class label: $(posclass)"
 
-        labelmap = (y) -> y == posclass
+        labelmap(y) = y in posclass
         train, test = load(dataset; labelmap = labelmap)
 
         dataset_dir = datadir("models", dataset_savename(dataset_settings))
@@ -281,7 +281,7 @@ end
 
 function plot_activity(file)
     a_train, a_test = load_activity(Molecules, Float32)
-    (~, y_train), (~, y_test) = load(Molecules; labelmap = (y) -> y == 1)
+    (~, y_train), (~, y_test) = load(Molecules; labelmap = (y) -> y in 1)
 
     d = BSON.load(file)
     plt = plot(
