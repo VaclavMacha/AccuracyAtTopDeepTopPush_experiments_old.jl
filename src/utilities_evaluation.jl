@@ -22,8 +22,18 @@ function tpr_at_top(targets, scores)
     return true_positive_rate(targets, scores, t)
 end
 
-function tpr_at_top(targets, scores)
-    t = maximum(scores[targets .== 0])
+function tpr_at_top2(targets, scores)
+    t = partialsort(scores[targets .== 0], 2; rev = true)
+    return true_positive_rate(targets, scores, t)
+end
+
+function tpr_at_top_not(targets, scores)
+    t = nextfloat(maximum(scores[targets .== 0]))
+    return true_positive_rate(targets, scores, t)
+end
+
+function tpr_at_top2_not(targets, scores)
+    t = nextfloat(partialsort(scores[targets .== 0], 2; rev = true))
     return true_positive_rate(targets, scores, t)
 end
 
@@ -117,6 +127,18 @@ function add_metrics!(d, key::Symbol)
     end
     if !haskey(d[key], :tpr_at_top)
         d[key][:tpr_at_top] = tpr_at_top(targets, scores)
+        overwrite = true
+    end
+    if !haskey(d[key], :tpr_at_top2)
+        d[key][:tpr_at_top2] = tpr_at_top2(targets, scores)
+        overwrite = true
+    end
+    if !haskey(d[key], :tpr_at_top_not)
+        d[key][:tpr_at_top_not] = tpr_at_top_not(targets, scores)
+        overwrite = true
+    end
+    if !haskey(d[key], :tpr_at_top2_not)
+        d[key][:tpr_at_top2_not] = tpr_at_top2_not(targets, scores)
         overwrite = true
     end
     if !haskey(d[key], :tpr_at_fpr_1)
@@ -362,6 +384,9 @@ function collect_metrics(path = datadir("models"); key::Symbol = :test, epochs =
 
             d = BSON.load(fl)
             dict[:tpr_at_top] = d[key][:tpr_at_top]
+            dict[:tpr_at_top2] = d[key][:tpr_at_top2]
+            dict[:tpr_at_top_not] = d[key][:tpr_at_top_not]
+            dict[:tpr_at_top2_not] = d[key][:tpr_at_top2_not]
             dict[:tpr_at_fpr_1] = d[key][:tpr_at_fpr_1]
             dict[:tpr_at_fpr_5] = d[key][:tpr_at_fpr_5]
             dict[:auroc_1] = d[key][:auroc_1]
@@ -384,7 +409,13 @@ function collect_metrics(path = datadir("models"); key::Symbol = :test, epochs =
         "tpr_at_fpr_5" => mean,
         "tpr_at_fpr_5" => err,
         "tpr_at_top" => mean,
-        "tpr_at_top" => err
+        "tpr_at_top" => err,
+        "tpr_at_top2" => mean,
+        "tpr_at_top2" => err,
+        "tpr_at_top_not" => mean,
+        "tpr_at_top_not" => err,
+        "tpr_at_top2_not" => mean,
+        "tpr_at_top2_not" => err,
     ]
     df2 = combine(gdf, combs)
 
