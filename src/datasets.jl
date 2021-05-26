@@ -175,47 +175,12 @@ using JLD2
 abstract type ImageNet <: Dataset end
 
 function load_raw(::Type{ImageNet}, T)
-    d_train = FileIO.load(datasetdir("imagenet", "train.jld2"))
-    d_test = FileIO.load(datasetdir("imagenet", "valid.jld2"))
-    train = (T.(d_train["x"])./256, d_train["y"])
-    test = (T.(d_test["x"])./256, d_test["y"])
-
-    return train, test
-end
-
-function build_network(::Type{<:ImageNet}; seed = 1234)
-    Random.seed!(seed)
-
-    return Chain(
-        # First convolution, operating upon a 32x32 image
-        Conv((3, 3), 3=>64, pad=(1,1), relu),
-        MaxPool((2,2)),
-
-        # Second convolution, operating upon a 16x16 image
-        Conv((3, 3), 64=>128, pad=(1,1), relu),
-        MaxPool((2,2)),
-
-        # Third convolution, operating upon a 4x4 image
-        Conv((3, 3), 128=>128, pad=(1,1), relu),
-        MaxPool((2,2)),
-
-        flatten,
-        Dense(2048, 1)
-    )
-end
-
-# -------------------------------------------------------------------------------
-# ImageNetPrep dataset
-# -------------------------------------------------------------------------------
-abstract type ImageNetPrep <: Dataset end
-
-function load_raw(::Type{ImageNetPrep}, T)
-    x = zeros(T, 10240, 1281167)
+    x = zeros(T, 62720, 1281167)
     y = zeros(Int, 1281167)
     ind = 1
-    for i in 1:10
-        @info "Loading $(i)/10"
-        d_train = FileIO.load(datasetdir("imagenet_64_prep", "train_$(i).jld2"))
+    for i in 1:26
+        @info "Loading $(i)/26"
+        d_train = FileIO.load(datasetdir("ImageNet", "train_$(i).jld2"))
 
         inds = ind:(ind + length(d_train["y"]) - 1)
         ind += length(d_train["y"])
@@ -223,17 +188,17 @@ function load_raw(::Type{ImageNetPrep}, T)
         y[inds] .= d_train["y"]
     end
 
-    d_test = FileIO.load(datasetdir("imagenet_64_prep", "valid.jld2"))
+    d_test = FileIO.load(datasetdir("ImageNet", "val_1.jld2"))
     test = (T.(d_test["x"]), d_test["y"])
 
     return (x, y), test
 end
 
-function build_network(::Type{<:ImageNetPrep}; seed = 1234)
+function build_network(::Type{<:ImageNet}; seed = 1234)
     Random.seed!(seed)
 
     return Chain(
-        Dense(10240, 1)
+        Dense(62720, 1)
     )
 end
 
