@@ -5,7 +5,7 @@ include(srcdir("models.jl"))
 include(srcdir("utilities_train.jl"))
 include(srcdir("utilities_evaluation.jl"))
 
-DrWatson.datadir(args...) = joinpath("/disk/macha/data_aaai", args...)
+DrWatson.datadir(args...) = joinpath("/disk/macha/data_deeptoppush", args...)
 
 # -------------------------------------------------------------------------------
 # Auxiliary functions

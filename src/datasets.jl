@@ -5,7 +5,7 @@ using Random
 using Flux: flatten
 import MLDatasets
 
-datasetdir(args...) = joinpath("/disk/macha/data_aaai/datasets", args...)
+datasetdir(args...) = datadir("datasets", args...)
 
 # -------------------------------------------------------------------------------
 # Utility functions

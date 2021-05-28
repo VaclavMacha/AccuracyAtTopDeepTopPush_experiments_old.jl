@@ -11,19 +11,12 @@ collect_benchmark()
 # ------------------------------------------------------------------------------------------
 # Metrics
 # ------------------------------------------------------------------------------------------
-df = collect_metrics(; key = :test)
+df = collect_metrics(; key = :test, epochs = 200)
 
 table_1 = @linq df |>
-    where(:batchsize .== 32) |>
-    where(:dataset .!= "Molecules")
+    where(:batchsize .== 32)
 
 CSV.write(datadir("results", "metrics_mean.csv"), table_1)
-
-table_2 = @linq df |>
-    where(:batchsize .== 32) |>
-    where(:dataset .== "Molecules")
-
-CSV.write(datadir("results", "molecules.csv"), table_2)
 
 
 # ------------------------------------------------------------------------------------------
@@ -43,11 +36,11 @@ Train_Settings = Dict(
 )
 
 Model_Settings = Dict(
-    :type => [BaseLine, DeepTopPush, PatMatNP, PatMatNP, APPerf, APPerf, TFCO, TFCO],
-    :arg => [missing, missing, 0.01, 0.05, 0.01, 0.05, 0.01, 0.05],
-    :surrogate => [missing, quadratic, quadratic, quadratic, missing, missing, missing, missing],
+    :type => [BaseLine, DeepTopPush, PatMatNP, APPerf, TFCO],
+    :arg => [missing, missing, 0.01, 0.01, 0.01],
+    :surrogate => [missing, quadratic, quadratic, missing, missing],
     :reg => 1e-3,
-    :buffer => [missing, true, missing, missing, missing, missing, missing, missing],
+    :buffer => [missing, true, missing, missing, missing],
 )
 
 key = :test
