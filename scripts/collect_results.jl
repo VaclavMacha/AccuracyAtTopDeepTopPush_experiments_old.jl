@@ -1,5 +1,5 @@
 using DrWatson
-@quickactivate "AccuracyAtTop_aaai"
+@quickactivate "AccuracyAtTop_DeepTopPush"
 
 include(srcdir("utilities.jl"))
 

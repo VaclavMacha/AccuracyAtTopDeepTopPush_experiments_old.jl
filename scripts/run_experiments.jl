@@ -1,5 +1,5 @@
 using DrWatson
-@quickactivate "AccuracyAtTop_aaai"
+@quickactivate "AccuracyAtTop_DeepTopPush"
 
 include(srcdir("utilities.jl"))
 
@@ -10,7 +10,6 @@ Dataset_Settings = Dict(
     :dataset => [FashionMNIST, CIFAR100, SVHN2Full, Molecules],
     :posclass => [0, 1, 1, 1],
 )
-
 
 Train_Settings = Dict(
     :batchsize => 32,
@@ -27,7 +26,6 @@ Model_Settings = Dict(
     :reg => 1e-3,
     :buffer => [missing, true, missing],
 )
-
 
 run_simulations(Dataset_Settings, Train_Settings, Model_Settings; nepochs_save = 50)
 run_evaluation(Dataset_Settings)

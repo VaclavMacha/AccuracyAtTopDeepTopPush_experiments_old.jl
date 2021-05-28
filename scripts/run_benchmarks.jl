@@ -1,5 +1,5 @@
 using DrWatson
-@quickactivate "AccuracyAtTop_aaai"
+@quickactivate "AccuracyAtTop_DeepTopPush"
 
 include(srcdir("utilities.jl"))
 
@@ -19,11 +19,11 @@ Train_Settings = Dict(
 )
 
 Model_Settings = Dict(
-    :type => [BaseLine, DeepTopPush, DeepTopPush, PatMatNP, PatMatNP, APPerf, APPerf],
-    :arg => [missing, missing, missing, 0.01, 0.05, 0.01, 0.05],
-    :surrogate => [missing, quadratic, quadratic, quadratic, quadratic, missing, missing],
+    :type => [BaseLine, DeepTopPush, PatMatNP, APPerf],
+    :arg => [missing, missing, 0.01, 0.01],
+    :surrogate => [missing, quadratic, quadratic, missing],
     :reg => 1e-3,
-    :buffer => [missing, false, true, missing, missing, missing, missing],
+    :buffer => [missing, true, missing, missing],
 )
 
 run_benchmark(Dataset_Settings, Train_Settings, Model_Settings)
