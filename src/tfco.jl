@@ -1,4 +1,4 @@
-ENV["PYTHON"] = "/opt/rh/rh-python36/root/usr/bin/python"
+ENV["PYTHON"] = ""
 
 using PyCall
 
@@ -7,6 +7,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow_constrained_optimization as tfco
 import time
+
 
 def batch_provider(data, num_epochs=10, shuffle=True, batch_size=32):
     def make_batch():
