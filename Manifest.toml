@@ -13,9 +13,9 @@ uuid = "1520ce14-60c1-5f80-bbc7-55ef81b5835c"
 version = "0.3.3"
 
 [[AccuracyAtTop]]
-deps = ["Flux", "LinearAlgebra", "Statistics", "Zygote"]
-git-tree-sha1 = "2a822694a90dbe1783008519eab4f4b9b64d6247"
-repo-rev = "develop"
+deps = ["BSON", "DataStructures", "Flux", "LinearAlgebra", "Parameters", "ProgressMeter", "Random", "Reexport", "Statistics", "Test", "TimerOutputs", "Zygote"]
+git-tree-sha1 = "a5163bf6d7b1048203d5a3d4fa39395a4f8c1192"
+repo-rev = "NeurIPS"
 repo-url = "https://github.com/VaclavMacha/AccuracyAtTop.jl"
 uuid = "99d982fd-5277-407e-85b7-ffc618e6d0f5"
 version = "0.1.0"
@@ -701,6 +701,12 @@ version = "1.3.1+3"
 git-tree-sha1 = "293b70ac1780f9584c89268a6e2a560d938a7065"
 uuid = "bac558e1-5e72-5ebc-8fee-abe8a469f55d"
 version = "1.3.0"
+
+[[Parameters]]
+deps = ["OrderedCollections", "UnPack"]
+git-tree-sha1 = "2276ac65f1e236e0a6ea70baff3f62ad4c625345"
+uuid = "d96e819e-fc66-5662-9728-84c9c7592b0a"
+version = "0.12.2"
 
 [[Parsers]]
 deps = ["Dates", "Test"]
