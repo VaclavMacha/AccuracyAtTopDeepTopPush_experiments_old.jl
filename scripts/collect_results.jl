@@ -18,7 +18,6 @@ table_1 = @linq df |>
 
 CSV.write(datadir("results", "metrics_mean.csv"), table_1)
 
-
 # ------------------------------------------------------------------------------------------
 # Curves
 # ------------------------------------------------------------------------------------------
@@ -43,6 +42,10 @@ Model_Settings = Dict(
     :buffer => [missing, true, missing, missing, missing],
 )
 
-key = :test
-xlims = (1e-3, 1)
-collect_curves(Dataset_Settings,Train_Settings,Model_Settings; key = key, xlims = xlims)
+collect_curves(
+    Dataset_Settings,
+    Train_Settings,
+    Model_Settings;
+    key = :test,
+    xlims = (1e-3, 1),
+)
