@@ -1,35 +1,75 @@
 using DrWatson
 @quickactivate "AccuracyAtTop_DeepTopPush"
 
-include(srcdir("utilities.jl"))
+using Tar, ProgressMeter, MAT, CSV, DataFrames, DelimitedFiles
 
-using FileIO, JLD2, NPZ
+# extraction
+const IMAGENET_DIR = "/disk/macha/data_deeptoppush/datasets/ImageNet2012"
+const IMAGENET_VERSION = "ILSVRC2012"
 
-imagenetdir(args...) = datasetdir("ImageNet", args...)
+function extract_train(file)
+    dir = joinpath(IMAGENET_DIR, "train")
+    tmp1 = joinpath(IMAGENET_DIR, "tmp")
+    mkpath(dir)
+    Tar.extract(file, tmp1)
 
-function npy_to_jld2(i, dataset::String; remove = false)
-    dataset in ["val", "train"] || error("dataset must be one of: train, val")
-    @info "Loading data $(dataset)_$(i)"
-    @time begin
-        y = npzread(datadir("$(dataset)_labels_$(i).npy"))
-        x = permutedims(npzread(datadir("$(dataset)_samples_$(i).npy")), (2, 1))
-        s = permutedims(npzread(datadir("$(dataset)_scores_$(i).npy")), (2, 1))
+    @showprogress for file in readdir(tmp1; join = true)
+        tmp2 = Tar.extract(file)
+        datadir = joinpath(dir, basename(file)[1:end-4])
+        mkpath(datadir)
+        files = readdir(tmp2)
+        mv.(joinpath.(tmp2, files), joinpath.(datadir, files))
     end
-
-
-    @info "Saving data $(dataset)_$(i)"
-    @time FileIO.save(datadir("$(dataset)_$(i).jld2"), Dict("x" => x, "y" => y, "s" => s))
-
-    if remove
-        @info "Removing .npy files"
-        rm(datadir("$(dataset)_labels_$(i).npy"))
-        rm(datadir("$(dataset)_samples_$(i).npy"))
-        rm(datadir("$(dataset)_scores_$(i).npy"))
-    end
-    return y, x, s
+    rm(tmp1; recursive = true)
+    return 
 end
 
-for i in 1:26
-    @info i
-    @time y, x, s = npy_to_jld2(i, "train"; remove = true);
+function extract_test(file)
+    dir = joinpath(IMAGENET_DIR, "test")
+    mkpath(dir)
+    Tar.extract(file, dir)
+    return 
 end
+
+extract_train(IMAGENET_DIR * "/$(IMAGENET_VERSION)_img_train.tar")
+extract_test(IMAGENET_DIR * "/$(IMAGENET_VERSION)_img_val.tar")
+
+# label extraction
+function create_label_map(meta::String)
+    m = matread(meta)["synsets"]
+    return Dict(String.(m["WNID"]) .=> Int.(m["$(IMAGENET_VERSION)_ID"]))
+end
+
+function data_train(label_map)
+    dir_train = joinpath(IMAGENET_DIR, "train")
+
+    dfs = map(readdir(dir_train)) do dir
+        return DataFrame(
+            files = readdir(joinpath(dir_train, dir); join = true),
+            labels = label_map[dir],
+            category = dir,
+        )
+    end
+    df = reduce(vcat, dfs)
+    CSV.write(joinpath(IMAGENET_DIR, "data_train.csv"), df)
+    return df
+end
+
+function data_test(file, label_map)
+    dir_test = joinpath(IMAGENET_DIR, "test")
+    rev_map = Dict(values(label_map) .=> keys(label_map))
+    labels = readdlm(file, ' ', Int, '\n')[:]
+
+    df = DataFrame(
+        files = readdir(dir_test; join = true),
+        labels = labels,
+        category = [rev_map[label] for label in labels],
+    )
+    CSV.write(joinpath(IMAGENET_DIR, "data_test.csv"), df)
+    return df
+end
+
+label_map = create_label_map(IMAGENET_DIR * "/meta.mat")
+
+data_train(label_map)
+data_test(IMAGENET_DIR * "/$(IMAGENET_VERSION)_validation_ground_truth.txt", label_map)

@@ -169,37 +169,66 @@ end
 # -------------------------------------------------------------------------------
 # ImageNet dataset
 # -------------------------------------------------------------------------------
-import FileIO
-using JLD2
+using Images, ImageMagick
+
+function load_image(file, resize)
+    img = ImageMagick.load(file)
+    if !isnothing(resize) && size(img) != resize
+        img = Images.imresize(img, resize)
+    end
+    return img
+end
+
+struct ImageFiles{T<:Real, N}
+    filenames::Vector{String}
+    resize::Tuple
+
+    function ImageFiles(filenames, resize; T = Float32)
+        N = size(Images.channelview(load_image(filenames[1], resize)), 1)
+        return new{T, N}(filenames, resize)
+    end
+end
+
+function Base.show(io::IO, d::ImageFiles{T, N}) where {T, N}
+    sz = (d.resize..., N, length(d.filenames))
+    print(io, join(sz, "x"), " ImageArray{$T}")
+end
+
+Base.length(d::ImageFiles) = length(d.filenames)
+Base.ndims(::ImageFiles) = 4
+Base.getindex(d::ImageFiles, ind::Int) = getindex(d, [ind])
+
+function Base.getindex(d::ImageFiles{T, N}, inds) where {T, N}
+    X = Array{T}(undef, d.resize..., N, length(inds))
+
+    for (j, i) in enumerate(inds)
+        img = load_image(d.filenames[i], d.resize)
+        X[:, :, :, j] .= PermutedDimsArray(channelview(img), (2,3,1))
+    end
+    return X
+end
+
+function getdim(imgs::ImageFiles, d::Integer, inds)
+    d == ndims(imgs) || error("not supported slicing")
+    return imgs[inds]
+end
+
+reshape_samples(imgs::ImageFiles) = imgs
 
 abstract type ImageNet <: Dataset end
 
 function load_raw(::Type{ImageNet}, T)
-    x = zeros(T, 62720, 1281167)
-    y = zeros(Int, 1281167)
-    ind = 1
-    for i in 1:26
-        @info "Loading $(i)/26"
-        d_train = FileIO.load(datasetdir("ImageNet", "train_$(i).jld2"))
+    d_train = CSV.read(datasetdir("ImageNet2012", "data_train.csv"), DataFrame)
+    d_test = CSV.read(datasetdir("ImageNet2012", "data_test.csv"), DataFrame)
 
-        inds = ind:(ind + length(d_train["y"]) - 1)
-        ind += length(d_train["y"])
-        x[:, inds] .= d_train["x"]
-        y[inds] .= d_train["y"]
-    end
-
-    d_test = FileIO.load(datasetdir("ImageNet", "val_1.jld2"))
-    test = (T.(d_test["x"]), d_test["y"])
-
-    return (x, y), test
+    train = (ImageFiles(d_train.files, (224, 224); T), d_train.labels)
+    test = (ImageFiles(d_test.files, (224, 224); T), d_test.labels)
+    return train, test
 end
 
 function build_network(::Type{<:ImageNet}; seed = 1234)
     Random.seed!(seed)
-
-    return Chain(
-        Dense(62720, 1)
-    )
+    return EfficientNet.from_pretrained("efficientnet-b0")
 end
 
 # -------------------------------------------------------------------------------
