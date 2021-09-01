@@ -1,6 +1,6 @@
 # AccuracyAtTop_DeepTopPush
 
-This repository is a complementary material to our paper *[DeepTopPush: Simple and Scalable Method for Accuracy at the Top]()*. This paper was submitted to the [Thirty-fifth Conference on Neural Information Processing Systems NeurIPS 2021](https://nips.cc/).
+This repository is a complementary material to our paper *DeepTopPush: Simple and Scalable Method for Accuracy at the Top*. This paper was submitted to the [Thirty-fifth Conference on Neural Information Processing Systems NeurIPS 2021](https://nips.cc/).
 
 # Running the codes
 
