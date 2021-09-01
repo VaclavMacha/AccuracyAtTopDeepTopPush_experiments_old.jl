@@ -67,7 +67,7 @@ Dataset_Settings = Dict(
 
 Train_Settings = Dict(
     :batchsize => 32,
-    :epochs => 200,
+    :epochs => 10,
     :optimiser => Descent,
     :steplength => 0.0001,
     :seed => 1,
