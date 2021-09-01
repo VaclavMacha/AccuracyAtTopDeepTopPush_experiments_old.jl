@@ -1,6 +1,11 @@
 using Flux
 using MLDataPattern
 using Random
+using CSV
+using DataFrames
+using Images
+using ImageMagick
+using EfficientNet
 
 using Flux: flatten
 import MLDatasets
@@ -169,28 +174,17 @@ end
 # -------------------------------------------------------------------------------
 # ImageNet dataset
 # -------------------------------------------------------------------------------
-using Images, ImageMagick
-
-function load_image(file, resize)
-    img = ImageMagick.load(file)
-    if !isnothing(resize) && size(img) != resize
-        img = Images.imresize(img, resize)
-    end
-    return img
-end
-
-struct ImageFiles{T<:Real, N}
+struct ImageFiles{T<:Real, W, H, C}
     filenames::Vector{String}
-    resize::Tuple
 
-    function ImageFiles(filenames, resize; T = Float32)
-        N = size(Images.channelview(load_image(filenames[1], resize)), 1)
-        return new{T, N}(filenames, resize)
+    function ImageFiles(filenames; T = Float32)
+        C, W, H = size(Images.channelview(Images.load(filenames[1])))
+        return new{T, W, H, C}(filenames)
     end
 end
 
-function Base.show(io::IO, d::ImageFiles{T, N}) where {T, N}
-    sz = (d.resize..., N, length(d.filenames))
+function Base.show(io::IO, d::ImageFiles{T, W, H, C}) where {T, W, H, C}
+    sz = (W, H, C, length(d.filenames))
     print(io, join(sz, "x"), " ImageArray{$T}")
 end
 
@@ -198,11 +192,11 @@ Base.length(d::ImageFiles) = length(d.filenames)
 Base.ndims(::ImageFiles) = 4
 Base.getindex(d::ImageFiles, ind::Int) = getindex(d, [ind])
 
-function Base.getindex(d::ImageFiles{T, N}, inds) where {T, N}
-    X = Array{T}(undef, d.resize..., N, length(inds))
+function Base.getindex(d::ImageFiles{T, W, H, C}, inds) where {T, W, H, C}
+    X = Array{T}(undef, W, H, C, length(inds))
 
     for (j, i) in enumerate(inds)
-        img = load_image(d.filenames[i], d.resize)
+        img = Images.load(d.filenames[i])
         X[:, :, :, j] .= PermutedDimsArray(channelview(img), (2,3,1))
     end
     return X
@@ -218,17 +212,27 @@ reshape_samples(imgs::ImageFiles) = imgs
 abstract type ImageNet <: Dataset end
 
 function load_raw(::Type{ImageNet}, T)
-    d_train = CSV.read(datasetdir("ImageNet2012", "data_train.csv"), DataFrame)
-    d_test = CSV.read(datasetdir("ImageNet2012", "data_test.csv"), DataFrame)
+    d_train = CSV.read(datasetdir("ImageNet224", "data_train.csv"), DataFrame)
+    d_test = CSV.read(datasetdir("ImageNet224", "data_test.csv"), DataFrame)
 
-    train = (ImageFiles(d_train.files, (224, 224); T), d_train.labels)
-    test = (ImageFiles(d_test.files, (224, 224); T), d_test.labels)
+    train = (ImageFiles(d_train.files; T), d_train.labels)
+    test = (ImageFiles(d_test.files; T), d_test.labels)
     return train, test
 end
 
 function build_network(::Type{<:ImageNet}; seed = 1234)
     Random.seed!(seed)
-    return EfficientNet.from_pretrained("efficientnet-b0")
+    model = EfficientNet.from_pretrained("efficientnet-b0")
+
+    return EffNet(
+        model.stem,
+        model.blocks,
+        model.head,
+        model.pooling,
+        Flux.Chain(model.top[1], Dense(1280, 1)),
+        model.drop_connect,
+        model.model_name,
+    )
 end
 
 # -------------------------------------------------------------------------------

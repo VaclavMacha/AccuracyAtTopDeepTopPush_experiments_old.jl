@@ -40,8 +40,8 @@ function create_label_map(meta::String)
     return Dict(String.(m["WNID"]) .=> Int.(m["$(IMAGENET_VERSION)_ID"]))
 end
 
-function data_train(label_map)
-    dir_train = joinpath(IMAGENET_DIR, "train")
+function data_train(label_map, image_dir = IMAGENET_DIR)
+    dir_train = joinpath(image_dir, "train")
 
     dfs = map(readdir(dir_train)) do dir
         return DataFrame(
@@ -51,12 +51,12 @@ function data_train(label_map)
         )
     end
     df = reduce(vcat, dfs)
-    CSV.write(joinpath(IMAGENET_DIR, "data_train.csv"), df)
+    CSV.write(joinpath(image_dir, "data_train.csv"), df)
     return df
 end
 
-function data_test(file, label_map)
-    dir_test = joinpath(IMAGENET_DIR, "test")
+function data_test(file, label_map, image_dir = IMAGENET_DIR)
+    dir_test = joinpath(image_dir, "test")
     rev_map = Dict(values(label_map) .=> keys(label_map))
     labels = readdlm(file, ' ', Int, '\n')[:]
 
@@ -65,7 +65,7 @@ function data_test(file, label_map)
         labels = labels,
         category = [rev_map[label] for label in labels],
     )
-    CSV.write(joinpath(IMAGENET_DIR, "data_test.csv"), df)
+    CSV.write(joinpath(image_dir, "data_test.csv"), df)
     return df
 end
 
@@ -73,3 +73,51 @@ label_map = create_label_map(IMAGENET_DIR * "/meta.mat")
 
 data_train(label_map)
 data_test(IMAGENET_DIR * "/$(IMAGENET_VERSION)_validation_ground_truth.txt", label_map)
+
+# reshape all images
+using Images, ImageMagick
+using Base.Threads
+using PyCall
+
+py"""
+from PIL import Image
+import numpy
+
+def convert_to_rgb(file):
+    img = Image.open(file).convert('RGB')
+    img.save(file)
+    return img
+"""
+
+function load_image(file, resize)
+    img = RGB.(ImageMagick.load(file))
+    if !isnothing(resize) && size(img) != resize
+        img = Images.imresize(img, resize)
+    end
+    return img
+end
+
+df = vcat(
+    CSV.read(joinpath(IMAGENET_DIR, "data_test.csv"), DataFrame),
+    CSV.read(joinpath(IMAGENET_DIR, "data_train.csv"), DataFrame),
+)
+
+@time Threads.@threads for file in files
+    file_new = replace(file, "ImageNet2012" => "ImageNet224")
+    file_new = replace(file_new, "JPEG" => "png")
+    if !isfile(file_new)
+        try
+            img = load_image(file, (224, 224))
+        catch
+            py"convert_to_rgb"(file)
+            img = load_image(file, (224, 224))
+        end
+        mkpath(dirname(file_new))
+        Images.save(file_new, img)
+    end
+end
+
+image_dir = "/disk/macha/data_deeptoppush/datasets/ImageNet224"
+
+data_train(label_map, image_dir)
+data_test(IMAGENET_DIR * "/$(IMAGENET_VERSION)_validation_ground_truth.txt", label_map, image_dir)
