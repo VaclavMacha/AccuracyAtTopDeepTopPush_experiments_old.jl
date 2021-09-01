@@ -121,7 +121,7 @@ function itercounter(c::CallBack)
 end
 
 function itertimer(c::CallBack)
-    tm = round((c.bar.tlast - c.bar.tfirst)/c.bar.counter; sigdigits = 2)
+    tm = round((c.bar.tlast - c.bar.tinit)/c.bar.counter; sigdigits = 2)
     return ("Average time per iteration", string(tm, "s"))
 end
 
@@ -132,7 +132,7 @@ function epochcounter(c::CallBack)
 end
 
 function epochtimer(c::CallBack)
-    tm = round(c.epochlength*(c.bar.tlast - c.bar.tfirst)/c.bar.counter; sigdigits = 2)
+    tm = round(c.epochlength*(c.bar.tlast - c.bar.tinit)/c.bar.counter; sigdigits = 2)
     return ("Average time per epoch", string(tm, "s"))
 end
 
@@ -156,7 +156,7 @@ function save_simulation(
     train_settings[:epochlength] = c.epochlength
     train_settings[:iters] = c.counter
 
-    tm = (c.bar.tlast - c.bar.tfirst)/c.bar.counter
+    tm = (c.bar.tlast - c.bar.tinit)/c.bar.counter
 
     simulation = Dict(
         :dataset_settings => deepcopy(dataset_settings),
